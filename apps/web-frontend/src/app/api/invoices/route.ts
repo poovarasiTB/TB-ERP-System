@@ -1,0 +1,79 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../auth/[...nextauth]/route';
+
+const INVOICE_SERVICE_URL = process.env.INVOICE_SERVICE_URL || 'http://localhost:8002';
+
+/**
+ * BFF API Route: Proxy requests to Invoice Service
+ */
+export async function GET(request: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(request.url);
+        const queryString = searchParams.toString();
+
+        const response = await fetch(
+            `${INVOICE_SERVICE_URL}/api/v1/invoices${queryString ? `?${queryString}` : ''}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${(session as any).accessToken}`,
+                    'X-Request-ID': crypto.randomUUID(),
+                },
+            }
+        );
+
+        const data = await response.json();
+        return NextResponse.json(data, { status: response.status });
+    } catch (error) {
+        console.error('Invoice API Error:', error);
+        return NextResponse.json({ error: 'Service Unavailable' }, { status: 503 });
+    }
+}
+
+export async function POST(request: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const userRoles = (session.user as any)?.roles || [];
+        if (!userRoles.includes('admin') && !userRoles.includes('accountant')) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        const body = await request.json();
+
+        const response = await fetch(`${INVOICE_SERVICE_URL}/api/v1/invoices`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${(session as any).accessToken}`,
+                'X-Request-ID': crypto.randomUUID(),
+            },
+            body: JSON.stringify(body),
+        });
+
+        const data = await response.json();
+        return NextResponse.json(data, { status: response.status });
+    } catch (error) {
+        console.error(`Invoice API Error (${INVOICE_SERVICE_URL}):`, error);
+        return NextResponse.json(
+            {
+                error: 'Service Unavailable',
+                message: `Invoice service is not responding at ${INVOICE_SERVICE_URL}`,
+                details: error instanceof Error ? error.message : String(error)
+            },
+            { status: 503 }
+        );
+    }
+}

@@ -1,0 +1,220 @@
+services:
+  # ===========================================
+  # DATABASE LAYER - PostgreSQL Instances
+  # ===========================================
+  
+  asset_db:
+    image: postgres:15-alpine
+    container_name: tb_erp_asset_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: asset_db
+      POSTGRES_USER: ${ASSET_DB_USER:-asset_user}
+      POSTGRES_PASSWORD: ${ASSET_DB_PASSWORD:-asset_secret}
+    volumes:
+      - asset_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - data_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ASSET_DB_USER:-asset_user} -d asset_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  invoice_db:
+    image: postgres:15-alpine
+    container_name: tb_erp_invoice_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: invoice_db
+      POSTGRES_USER: ${INVOICE_DB_USER:-invoice_user}
+      POSTGRES_PASSWORD: ${INVOICE_DB_PASSWORD:-invoice_secret}
+    volumes:
+      - invoice_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - data_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${INVOICE_DB_USER:-invoice_user} -d invoice_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  employee_db:
+    image: postgres:15-alpine
+    container_name: tb_erp_employee_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: employee_db
+      POSTGRES_USER: ${EMPLOYEE_DB_USER:-employee_user}
+      POSTGRES_PASSWORD: ${EMPLOYEE_DB_PASSWORD:-employee_secret}
+    volumes:
+      - employee_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - data_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${EMPLOYEE_DB_USER:-employee_user} -d employee_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # CACHE LAYER - Redis
+  # ===========================================
+  
+  redis:
+    image: redis:7-alpine
+    container_name: tb_erp_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - data_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # BACKEND LAYER - FastAPI Microservices
+  # ===========================================
+  
+  asset_service:
+    build:
+      context: ./apps/asset-service
+      dockerfile: Dockerfile
+    container_name: tb_erp_asset_service
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./apps/asset-service:/app
+    environment:
+      - DATABASE_URL=postgresql://${ASSET_DB_USER:-asset_user}:${ASSET_DB_PASSWORD:-asset_secret}@asset_db:5432/asset_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    ports:
+      - "8001:8000"
+    depends_on:
+      asset_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_network
+      - data_network
+
+  invoice_service:
+    build:
+      context: ./apps/invoice-service
+      dockerfile: Dockerfile
+    container_name: tb_erp_invoice_service
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./apps/invoice-service:/app
+    environment:
+      - DATABASE_URL=postgresql://${INVOICE_DB_USER:-invoice_user}:${INVOICE_DB_PASSWORD:-invoice_secret}@invoice_db:5432/invoice_db
+      - REDIS_URL=redis://redis:6379/1
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    ports:
+      - "8002:8000"
+    depends_on:
+      invoice_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_network
+      - data_network
+
+  employee_service:
+    build:
+      context: ./apps/employee-service
+      dockerfile: Dockerfile
+    container_name: tb_erp_employee_service
+    restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./apps/employee-service:/app
+    environment:
+      - DATABASE_URL=postgresql://${EMPLOYEE_DB_USER:-employee_user}:${EMPLOYEE_DB_PASSWORD:-employee_secret}@employee_db:5432/employee_db
+      - REDIS_URL=redis://redis:6379/2
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    ports:
+      - "8003:8000"
+    depends_on:
+      employee_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_network
+      - data_network
+
+  # ===========================================
+  # FRONTEND LAYER - Next.js BFF
+  # ===========================================
+  
+  web_frontend:
+    build:
+      context: ./apps/web-frontend
+      dockerfile: Dockerfile
+    container_name: tb_erp_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=${ENVIRONMENT:-development}
+      - ASSET_SERVICE_URL=http://asset_service:8000
+      - INVOICE_SERVICE_URL=http://invoice_service:8000
+      - EMPLOYEE_SERVICE_URL=http://employee_service:8000
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-nextauth-secret-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+    depends_on:
+      - asset_service
+      - invoice_service
+      - employee_service
+    networks:
+      - frontend_network
+      - backend_network
+
+# ===========================================
+# NETWORKS
+# ===========================================
+
+networks:
+  frontend_network:
+    driver: bridge
+    name: tb_erp_frontend
+  backend_network:
+    driver: bridge
+    name: tb_erp_backend
+  data_network:
+    driver: bridge
+    name: tb_erp_data
+
+# ===========================================
+# VOLUMES
+# ===========================================
+
+volumes:
+  asset_data:
+    name: tb_erp_asset_data
+  invoice_data:
+    name: tb_erp_invoice_data
+  employee_data:
+    name: tb_erp_employee_data
+  redis_data:
+    name: tb_erp_redis_data
