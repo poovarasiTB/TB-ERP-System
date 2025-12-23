@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     
-    # Database Configuration
+    # Database Configuration - MUST be set via environment variables
     DB_USER: str = "postgres"
-    DB_PASSWORD: str = "2618"
+    DB_PASSWORD: str = "change_me_in_env"
     DB_HOST: str = "localhost"
     DB_PORT: str = "5432"
     DB_NAME: str = "tb_erp_db"
@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
     
-    # Security
-    JWT_SECRET: str = "your-secret-key-change-in-production"
+    # Security - MUST be set via environment variables
+    JWT_SECRET: str = "change-this-secret-in-production"
     JWT_ALGORITHM: str = "HS256"
     
     # Pydantic Settings configuration

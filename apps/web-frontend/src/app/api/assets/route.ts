@@ -10,38 +10,71 @@ const ASSET_SERVICE_URL = process.env.ASSET_SERVICE_URL || 'http://localhost:800
  */
 export async function GET(request: NextRequest) {
     try {
-        // Verify authentication
-        const session = await getServerSession(authOptions);
+        console.log('[Assets API] Checking session...');
+
+        // Verify authentication with timeout
+        let session;
+        try {
+            session = await getServerSession(authOptions);
+        } catch (sessionError) {
+            console.error('[Assets API] Session error:', sessionError);
+            return NextResponse.json(
+                { error: 'Session Error', message: 'Could not verify session' },
+                { status: 401 }
+            );
+        }
 
         if (!session) {
+            console.log('[Assets API] No session found');
             return NextResponse.json(
                 { error: 'Unauthorized', message: 'Please sign in to access this resource' },
                 { status: 401 }
             );
         }
 
+        console.log('[Assets API] Session found, user:', session.user?.email);
+
         // Extract query parameters
         const { searchParams } = new URL(request.url);
         const queryString = searchParams.toString();
 
-        // Forward request to Asset Service
-        const response = await fetch(
-            `${ASSET_SERVICE_URL}/api/v1/assets${queryString ? `?${queryString}` : ''}`,
-            {
+        const targetUrl = `${ASSET_SERVICE_URL}/api/v1/assets${queryString ? `?${queryString}` : ''}`;
+        console.log('[Assets API] Calling:', targetUrl);
+
+        // Forward request to Asset Service with timeout
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        try {
+            const response = await fetch(targetUrl, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${(session as any).accessToken}`,
                     'X-Request-ID': crypto.randomUUID(),
                 },
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeout);
+
+            const data = await response.json();
+            console.log('[Assets API] Response status:', response.status);
+
+            return NextResponse.json(data, { status: response.status });
+        } catch (fetchError: any) {
+            clearTimeout(timeout);
+            if (fetchError.name === 'AbortError') {
+                console.error('[Assets API] Request timeout');
+                return NextResponse.json(
+                    { error: 'Timeout', message: 'Asset service took too long to respond' },
+                    { status: 504 }
+                );
             }
-        );
-
-        const data = await response.json();
-
-        return NextResponse.json(data, { status: response.status });
+            throw fetchError;
+        }
     } catch (error) {
-        console.error('Asset API Error:', error);
+        console.error('[Assets API] Error:', error);
         return NextResponse.json(
             { error: 'Service Unavailable', message: 'Asset service is not responding' },
             { status: 503 }
@@ -81,7 +114,7 @@ export async function POST(request: NextRequest) {
         const data = await response.json();
         return NextResponse.json(data, { status: response.status });
     } catch (error) {
-        console.error(`Asset API Error (${ASSET_SERVICE_URL}):`, error);
+        console.error(`[Assets API] POST Error:`, error);
         return NextResponse.json(
             {
                 error: 'Service Unavailable',

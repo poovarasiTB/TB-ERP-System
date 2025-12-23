@@ -1,0 +1,109 @@
+# ===========================================
+# TB ERP System - Backend Services for Local Development
+# ===========================================
+#
+# Prerequisites:
+#   1. Copy .env.example to .env
+#   2. Update .env with your actual database credentials
+#
+# Usage: docker-compose -f docker-compose.backend.yml up --build
+#
+# This runs ONLY the backend microservices in Docker.
+# Run the frontend NATIVELY with: npm run dev (in apps/web-frontend)
+#
+# Why this approach?
+# - Frontend has hot-reload, faster development
+# - Avoids 400+ MB node_modules transfer to Docker
+# - Backend services are isolated and consistent
+# ===========================================
+
+services:
+  # ===========================================
+  # Asset Management Service
+  # ===========================================
+  asset-service:
+    build:
+      context: ./apps/asset-service
+      dockerfile: Dockerfile
+    container_name: tb-asset-service
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # ===========================================
+  # Invoice Management Service
+  # ===========================================
+  invoice-service:
+    build:
+      context: ./apps/invoice-service
+      dockerfile: Dockerfile
+    container_name: tb-invoice-service
+    ports:
+      - "8002:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # ===========================================
+  # Employee Management Service
+  # ===========================================
+  employee-service:
+    build:
+      context: ./apps/employee-service
+      dockerfile: Dockerfile
+    container_name: tb-employee-service
+    ports:
+      - "8003:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+# ===========================================
+# NOTES
+# ===========================================
+#
+# Setup:
+#   1. Copy .env.example to .env
+#   2. Update .env with your database credentials
+#
+# Start backend services:
+#   docker-compose -f docker-compose.backend.yml up --build
+#
+# Start frontend (separate terminal):
+#   cd apps/web-frontend
+#   npm run dev
+#
+# Test backend health:
+#   curl http://localhost:8001/health  (Asset)
+#   curl http://localhost:8002/health  (Invoice)
+#   curl http://localhost:8003/health  (Employee)
+#
+# Access application:
+#   http://localhost:3000
+# ===========================================

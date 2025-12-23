@@ -1,6 +1,7 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { SignJWT } from 'jose';
+import { authenticateUser } from '@/lib/auth';
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -11,25 +12,23 @@ export const authOptions: NextAuthOptions = {
                 password: { label: 'Password', type: 'password' },
             },
             async authorize(credentials) {
-                // TODO: Replace with actual employee service authentication
-                // This is a placeholder for development
-                if (credentials?.email && credentials?.password) {
-                    // In production, call Employee Service to authenticate
-                    // const response = await fetch(`${process.env.EMPLOYEE_SERVICE_URL}/api/v1/auth/login`, {
-                    //   method: 'POST',
-                    //   headers: { 'Content-Type': 'application/json' },
-                    //   body: JSON.stringify(credentials),
-                    // });
-
-                    // Mock user for development
-                    return {
-                        id: '1',
-                        email: credentials.email,
-                        name: 'Admin User',
-                        roles: ['admin', 'asset_manager', 'accountant', 'hr_manager'],
-                    };
+                if (!credentials?.email || !credentials?.password) {
+                    throw new Error('Please enter email and password');
                 }
-                return null;
+
+                // Authenticate against database
+                const user = await authenticateUser(credentials.email, credentials.password);
+
+                if (!user) {
+                    throw new Error('Invalid email or password');
+                }
+
+                return {
+                    id: user.id.toString(),
+                    email: user.email,
+                    name: user.fullName,
+                    roles: user.roles,
+                };
             },
         }),
     ],
@@ -55,6 +54,7 @@ export const authOptions: NextAuthOptions = {
                 const jwt = await new SignJWT({
                     sub: token.id as string,
                     email: token.email,
+                    name: token.name,
                     roles: token.roles,
                 })
                     .setProtectedHeader({ alg: 'HS256' })

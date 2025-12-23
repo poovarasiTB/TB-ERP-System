@@ -4,6 +4,7 @@ Database session management with async SQLAlchemy
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from typing import AsyncGenerator
+import ssl
 
 from app.core.config import settings
 
@@ -12,12 +13,25 @@ DATABASE_URL = settings.DATABASE_URL.replace(
     "postgresql://", "postgresql+asyncpg://"
 )
 
+# Check if using cloud database (requires SSL)
+is_cloud = "render.com" in DATABASE_URL or "cloud" in DATABASE_URL.lower()
+
+# Create SSL context for cloud database
+connect_args = {}
+if is_cloud:
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    connect_args = {"ssl": ssl_context}
+
 engine = create_async_engine(
     DATABASE_URL,
     echo=settings.DEBUG,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    connect_args=connect_args,
 )
 
 AsyncSessionLocal = async_sessionmaker(

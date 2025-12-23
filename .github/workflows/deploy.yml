@@ -1,0 +1,199 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-south1
+
+jobs:
+  # Detect which services changed
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.changes.outputs.frontend }}
+      asset-service: ${{ steps.changes.outputs.asset-service }}
+      invoice-service: ${{ steps.changes.outputs.invoice-service }}
+      employee-service: ${{ steps.changes.outputs.employee-service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            frontend:
+              - 'apps/web-frontend/**'
+            asset-service:
+              - 'apps/asset-service/**'
+            invoice-service:
+              - 'apps/invoice-service/**'
+            employee-service:
+              - 'apps/employee-service/**'
+
+  # Deploy Asset Service
+  deploy-asset-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.asset-service == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push
+        working-directory: apps/asset-service
+        run: |
+          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/asset-service:${{ github.sha }} .
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/asset-service:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          gcloud run deploy asset-service \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/asset-service:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+
+  # Deploy Invoice Service
+  deploy-invoice-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.invoice-service == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push
+        working-directory: apps/invoice-service
+        run: |
+          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/invoice-service:${{ github.sha }} .
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/invoice-service:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          gcloud run deploy invoice-service \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/invoice-service:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+
+  # Deploy Employee Service
+  deploy-employee-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.employee-service == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push
+        working-directory: apps/employee-service
+        run: |
+          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/employee-service:${{ github.sha }} .
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/employee-service:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          gcloud run deploy employee-service \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/employee-service:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+
+  # Deploy Frontend (after backend services)
+  deploy-frontend:
+    needs:
+      [
+        detect-changes,
+        deploy-asset-service,
+        deploy-invoice-service,
+        deploy-employee-service,
+      ]
+    if: always() && needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Get Backend Service URLs
+        id: urls
+        run: |
+          echo "ASSET_URL=$(gcloud run services describe asset-service --region ${{ env.REGION }} --format='value(status.url)' 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+          echo "INVOICE_URL=$(gcloud run services describe invoice-service --region ${{ env.REGION }} --format='value(status.url)' 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+          echo "EMPLOYEE_URL=$(gcloud run services describe employee-service --region ${{ env.REGION }} --format='value(status.url)' 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+
+      - name: Build and Push
+        working-directory: apps/web-frontend
+        run: |
+          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/web-frontend:${{ github.sha }} .
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/web-frontend:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          FRONTEND_URL=$(gcloud run services describe web-frontend --region ${{ env.REGION }} --format='value(status.url)' 2>/dev/null || echo 'https://web-frontend-xxx.run.app')
+
+          gcloud run deploy web-frontend \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/tb-erp-images/web-frontend:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            --set-env-vars "NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}" \
+            --set-env-vars "NEXTAUTH_URL=$FRONTEND_URL" \
+            --set-env-vars "ASSET_SERVICE_URL=${{ steps.urls.outputs.ASSET_URL }}" \
+            --set-env-vars "INVOICE_SERVICE_URL=${{ steps.urls.outputs.INVOICE_URL }}" \
+            --set-env-vars "EMPLOYEE_SERVICE_URL=${{ steps.urls.outputs.EMPLOYEE_URL }}"
