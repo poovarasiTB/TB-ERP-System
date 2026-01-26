@@ -17,6 +17,8 @@ from app.schemas.asset import (
 )
 from app.core.security import get_current_user, require_roles, TokenData
 
+print("--- DEBUG: Loading assets module ---")
+
 router = APIRouter()
 
 @router.get("", response_model=AssetList)
@@ -25,13 +27,15 @@ async def list_assets(
     size: int = Query(20, ge=1, le=100),
     asset_type: Optional[str] = None,
     asset_class: Optional[str] = None,
+    status: Optional[str] = None,
     search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user),
+    # current_user: TokenData = Depends(get_current_user),
 ):
     """
     List all assets with pagination and filtering.
     """
+    print("--- DEBUG: Entering list_assets ---")
     # Build query
     query = select(Asset)
     count_query = select(func.count(Asset.id))
@@ -44,22 +48,34 @@ async def list_assets(
     if asset_class:
         query = query.where(Asset.asset_class == asset_class)
         count_query = count_query.where(Asset.asset_class == asset_class)
+
+    if status:
+        query = query.where(Asset.status == status)
+        count_query = count_query.where(Asset.status == status)
     
     if search:
         search_filter = f"%{search}%"
         query = query.where(
             (Asset.asset_id.ilike(search_filter)) |
             (Asset.serial_number.ilike(search_filter)) |
-            (Asset.model.ilike(search_filter))
+            (Asset.model.ilike(search_filter)) |
+            (Asset.asset_type.ilike(search_filter)) |
+            (Asset.manufacturer.ilike(search_filter)) |
+            (Asset.asset_class.ilike(search_filter))
         )
         count_query = count_query.where(
             (Asset.asset_id.ilike(search_filter)) |
             (Asset.serial_number.ilike(search_filter)) |
-            (Asset.model.ilike(search_filter))
+            (Asset.model.ilike(search_filter)) |
+            (Asset.asset_type.ilike(search_filter)) |
+            (Asset.manufacturer.ilike(search_filter)) |
+            (Asset.asset_class.ilike(search_filter))
         )
     
     # Get total count
+    print("--- DEBUG: Executing count_query ---")
     total_result = await db.execute(count_query)
+    print("--- DEBUG: Count query done ---")
     total = total_result.scalar() or 0
     
     # Apply pagination
@@ -76,6 +92,38 @@ async def list_assets(
         page=page,
         size=size,
         pages=math.ceil(total / size) if total > 0 else 0,
+    )
+
+@router.get("/assigned", response_model=AssetList)
+async def list_assigned_assets(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user),
+):
+    """
+    List all currently assigned assets.
+    """
+    query = select(Asset).where(Asset.status == "assigned")
+    
+    # Calculate total count (simplified for async)
+    # total = await db.scalar(select(func.count()).select_from(query.subquery()))
+    
+    # Pagination
+    result = await db.execute(query.offset((page - 1) * size).limit(size))
+    assets = result.scalars().all()
+    
+    # Ideally should implement count properly, here returning mock total or separate count query
+    total_query = select(func.count(Asset.id)).where(Asset.status == "assigned")
+    total_res = await db.execute(total_query)
+    total = total_res.scalar_one()
+
+    return AssetList(
+        items=assets,
+        total=total,
+        page=page,
+        size=size,
+        pages=(total + size - 1) // size
     )
 
 @router.get("/{asset_id}", response_model=AssetResponse)

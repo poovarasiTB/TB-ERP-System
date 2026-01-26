@@ -8,8 +8,8 @@ from pathlib import Path
 import os
 
 # Identify the root of the monorepo
-# Path is: apps/asset-service/app/core/config.py -> need to go up 4 levels
-ROOT_DIR = Path(__file__).parent.parent.parent.parent
+# Path is: apps/asset-service/app/core/config.py -> need to go up 5 levels to reach project root
+ROOT_DIR = Path(__file__).parent.parent.parent.parent.parent
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -18,12 +18,15 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     
-    # Database Configuration - MUST be set via environment variables
-    DB_USER: str = "postgres"
-    DB_PASSWORD: str = "change_me_in_env"
+    # Database Configuration - Shared across services
+    DB_USER: str = "admin"
+    DB_PASSWORD: str
     DB_HOST: str = "localhost"
     DB_PORT: str = "5432"
     DB_NAME: str = "tb_erp_db"
+    
+    # Specific Schema for this service
+    DB_SCHEMA: str = "assets"
     
     # Final Database URL (computed or overridden)
     DATABASE_URL: Optional[str] = None
@@ -31,12 +34,14 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
     
-    # Security - MUST be set via environment variables
-    JWT_SECRET: str = "change-this-secret-in-production"
+    # Security
+    JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
     
+    # CORS
+    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    
     # Pydantic Settings configuration
-    # Try loading from .env in current dir, then in monorepo root
     model_config = SettingsConfigDict(
         env_file=[".env", str(ROOT_DIR / ".env")],
         env_file_encoding="utf-8",
@@ -45,8 +50,8 @@ class Settings(BaseSettings):
     )
     
     def get_database_url(self) -> str:
-        """Construct database URL if not provided directly"""
-        if self.DATABASE_URL:
+        """Construct database URL if not provided directly or if it contains placeholders"""
+        if self.DATABASE_URL and not self.DATABASE_URL.startswith("postgresql://${"):
             # If it's a standard postgres:// URL, convert to asyncpg
             if self.DATABASE_URL.startswith("postgresql://"):
                 return self.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")

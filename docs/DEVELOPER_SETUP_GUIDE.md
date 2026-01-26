@@ -128,7 +128,7 @@ The `db/init_db.sql` script creates:
 - Sample data
 
 **Default Admin Credentials:**
-- Email: `sudharsan@trustybytes.in`
+- Email: `poovarasi@trustybytes.in`
 - Password: `admin123`
 
 ---
@@ -350,7 +350,7 @@ npm run dev
 
 ### Default Login
 
-- **Email:** `sudharsan@trustybytes.in`
+- **Email:** `poovarasi@trustybytes.in`
 - **Password:** `admin123`
 
 ---

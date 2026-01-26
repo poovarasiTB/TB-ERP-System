@@ -65,10 +65,10 @@ services:
     volumes:
       - ./apps/asset-service:/app
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-admin}:${DB_PASSWORD:-kbOZpYYBZLfoeQRlBFajBfxi8A2JwPwk}@postgres:5432/${DB_NAME:-tb_erp_db}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-tb_erp_db}
       - DB_SCHEMA=assets
-      - REDIS_URL=redis://redis:6379/0
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - JWT_SECRET=${JWT_SECRET}
       - ENVIRONMENT=${ENVIRONMENT:-development}
     ports:
       - "8001:8000"
@@ -91,10 +91,10 @@ services:
     volumes:
       - ./apps/invoice-service:/app
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-admin}:${DB_PASSWORD:-kbOZpYYBZLfoeQRlBFajBfxi8A2JwPwk}@postgres:5432/${DB_NAME:-tb_erp_db}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-tb_erp_db}
       - DB_SCHEMA=invoices
-      - REDIS_URL=redis://redis:6379/1
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/1}
+      - JWT_SECRET=${JWT_SECRET}
       - ENVIRONMENT=${ENVIRONMENT:-development}
     ports:
       - "8002:8000"
@@ -117,10 +117,10 @@ services:
     volumes:
       - ./apps/employee-service:/app
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-admin}:${DB_PASSWORD:-kbOZpYYBZLfoeQRlBFajBfxi8A2JwPwk}@postgres:5432/${DB_NAME:-tb_erp_db}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-tb_erp_db}
       - DB_SCHEMA=employees
-      - REDIS_URL=redis://redis:6379/2
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/2}
+      - JWT_SECRET=${JWT_SECRET}
       - ENVIRONMENT=${ENVIRONMENT:-development}
     ports:
       - "8003:8000"
@@ -147,13 +147,13 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=${ENVIRONMENT:-development}
-      - DATABASE_URL=postgresql://${DB_USER:-admin}:${DB_PASSWORD:-kbOZpYYBZLfoeQRlBFajBfxi8A2JwPwk}@postgres:5432/${DB_NAME:-tb_erp_db}
-      - ASSET_SERVICE_URL=http://asset_service:8000
-      - INVOICE_SERVICE_URL=http://invoice_service:8000
-      - EMPLOYEE_SERVICE_URL=http://employee_service:8000
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-nextauth-secret-change-in-production}
-      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-tb_erp_db}?schema=auth
+      - ASSET_SERVICE_URL=${ASSET_SERVICE_URL:-http://asset_service:8000}
+      - INVOICE_SERVICE_URL=${INVOICE_SERVICE_URL:-http://invoice_service:8000}
+      - EMPLOYEE_SERVICE_URL=${EMPLOYEE_SERVICE_URL:-http://employee_service:8000}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       - asset_service
       - invoice_service

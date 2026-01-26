@@ -65,7 +65,7 @@ export default function SignIn() {
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="name@company.com"
                             required
-                            style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                            style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.2)', color: 'black' }}
                         />
                     </div>
 
@@ -78,7 +78,7 @@ export default function SignIn() {
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="••••••••"
                             required
-                            style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white' }}
+                            style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '0.75rem', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.2)', color: 'black' }}
                         />
                     </div>
 

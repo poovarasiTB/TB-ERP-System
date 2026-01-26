@@ -181,13 +181,13 @@ ON CONFLICT (code) DO NOTHING;
 -- Password hash is bcrypt for "admin123"
 
 INSERT INTO auth.users (email, password_hash, full_name, is_active, is_verified)
-VALUES ('sudharsan@trustybytes.in', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.L5zQaSjT0Qf8Cy', 'System Admin', true, true)
+VALUES ('poovarasi@trustybytes.in', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.L5zQaSjT0Qf8Cy', 'System Admin', true, true)
 ON CONFLICT (email) DO NOTHING;
 
 -- Assign admin role to admin user
 INSERT INTO auth.user_roles (user_id, role_id)
 SELECT u.id, r.id FROM auth.users u, auth.roles r 
-WHERE u.email = 'sudharsan@trustybytes.in' AND r.name = 'admin'
+WHERE u.email = 'poovarasi@trustybytes.in' AND r.name = 'admin'
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- ==========================================================

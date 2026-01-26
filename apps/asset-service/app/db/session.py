@@ -16,13 +16,16 @@ DATABASE_URL = settings.DATABASE_URL.replace(
 # Check if using cloud database (requires SSL)
 is_cloud = "render.com" in DATABASE_URL or "cloud" in DATABASE_URL.lower()
 
-# Create SSL context for cloud database
-connect_args = {}
+# Create SSL and Schema context
+connect_args = {
+    "server_settings": {"search_path": settings.DB_SCHEMA}
+}
+
 if is_cloud:
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
-    connect_args = {"ssl": ssl_context}
+    connect_args["ssl"] = ssl_context
 
 engine = create_async_engine(
     DATABASE_URL,
@@ -46,15 +49,25 @@ Base = declarative_base()
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency to get database session"""
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+    print("--- DEBUG: get_db requested ---")
+    try:
+        async with AsyncSessionLocal() as session:
+            print("--- DEBUG: session acquired ---")
+            try:
+                yield session
+                print("--- DEBUG: session commit start ---")
+                await session.commit()
+                print("--- DEBUG: session commit done ---")
+            except Exception as e:
+                print(f"--- DEBUG: session rollback: {e} ---")
+                await session.rollback()
+                raise
+            finally:
+                print("--- DEBUG: session closing ---")
+                await session.close()
+    except Exception as e:
+        print(f"--- DEBUG: get_db FAILED: {e} ---")
+        raise e
 
 async def init_db():
     """Initialize database tables"""

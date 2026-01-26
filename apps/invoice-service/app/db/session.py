@@ -16,13 +16,16 @@ DATABASE_URL = settings.DATABASE_URL.replace(
 # Check if using cloud database (requires SSL)
 is_cloud = "render.com" in DATABASE_URL or "cloud" in DATABASE_URL.lower()
 
-# Create SSL context for cloud database
-connect_args = {}
+# Create SSL and Schema context
+connect_args = {
+    "server_settings": {"search_path": settings.DB_SCHEMA}
+}
+
 if is_cloud:
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
-    connect_args = {"ssl": ssl_context}
+    connect_args["ssl"] = ssl_context
 
 engine = create_async_engine(
     DATABASE_URL,

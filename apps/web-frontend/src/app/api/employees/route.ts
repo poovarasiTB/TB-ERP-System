@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 
-const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:8003';
+const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL;
+
+if (!EMPLOYEE_SERVICE_URL) {
+    console.error('[Employee API] CRITICAL: EMPLOYEE_SERVICE_URL is not defined in environment variables');
+}
 
 /**
  * BFF API Route: Proxy requests to Employee Service

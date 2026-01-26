@@ -17,6 +17,7 @@
 # - Backend services are isolated and consistent
 # ===========================================
 
+
 services:
   # ===========================================
   # Asset Management Service
